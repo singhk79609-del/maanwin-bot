@@ -8,7 +8,7 @@ from telebot.types import ReplyKeyboardMarkup, KeyboardButton
 from PIL import Image, ImageDraw, ImageFont
 
 # ---------------- CONFIGURATION ----------------
-TOKEN = "YOUR_TELEGRAM_BOT_TOKEN_HERE"  # Yahan apna Bot Token daalein
+TOKEN = os.getenv("BOT_TOKEN")  # Render Environment Variable se secure tareeqe se uthega
 
 # Aapke exact sticker file IDs
 WIN_STICKER_ID = "CAACAgUAAxkBAAESBUxqyjYIPEDt5ahD21hMcG4aX3gSQQACNxIAAnYF2FSRemp6wVeLrD0E"
@@ -42,7 +42,7 @@ def save_channels(channels):
 
 saved_channels = load_channels()
 
-# ---------------- MINI KEYBOARD (Multi-Channel Style)[span_1](start_span)[span_1](end_span) ----------------
+# ---------------- MINI KEYBOARD (Multi-Channel Style) ----------------
 def get_main_keyboard():
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     btn1 = KeyboardButton("▶ Start Prediction")
