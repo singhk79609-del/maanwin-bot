@@ -8,26 +8,23 @@ from telebot.types import ReplyKeyboardMarkup, KeyboardButton
 from PIL import Image, ImageDraw, ImageFont
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# --------- RENDER WEB SERVICE HEALTH CHECK FIX ---------
+# --------- HEALTH CHECK FOR RENDER ---------
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Maan Win Bot is active and running!")
+        self.wfile.write(b"Bot is active!")
 
 def run_web_server():
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
     server.serve_forever()
 
-# Web server ko background thread mein chala rahe hain taaki Render ka port busy na ho
 threading.Thread(target=run_web_server, daemon=True).start()
-# --------------------------------------------------------
 
-# ---------------- CONFIGURATION ----------------
-TOKEN = os.getenv("BOT_TOKEN")  # Render Environment Variable se secure tareeqe se uthega
+# ---------------- CONFIG ----------------
+TOKEN = os.getenv("BOT_TOKEN")
 
-# Aapke exact sticker file IDs
 WIN_STICKER_ID = "CAACAgUAAxkBAAESBUxqyjYIPEDt5ahD21hMcG4aX3gSQQACNxIAAnYF2FSRemp6wVeLrD0E"
 LOSS_STICKER_ID = "CAACAgUAAxkBAAESBVBqyjZPkGxu_944MSW82L6CRAABIFMAAh8SAAJBAZhW1wckyA5w-N09BA"
 JACKPOT_STICKER_ID = "CAACAgUAAxkBAAESBU5qyjYSFQVYUL7i519ZKT8K0ki_jQACbhcAAh2MgFdeqKpTfjvIGD0E"
@@ -58,7 +55,6 @@ def save_channels(channels):
 
 saved_channels = load_channels()
 
-# ---------------- MINI KEYBOARD ----------------
 def get_main_keyboard():
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     btn1 = KeyboardButton("▶ Start Prediction")
@@ -72,7 +68,7 @@ def get_main_keyboard():
 def send_welcome(message):
     bot.send_message(
         message.chat.id,
-        "🤖 **MAAN WIN PREDICTION BOT CONNECTED**\nUse the buttons below to manage channels and control predictions.",
+        "🤖 **MAAN WIN PREDICTION BOT CONNECTED**",
         reply_markup=get_main_keyboard(),
         parse_mode="Markdown"
     )
@@ -80,30 +76,24 @@ def send_welcome(message):
 @bot.message_handler(func=lambda message: message.text == "▶ Start Prediction")
 def start_prediction_command(message):
     global is_running
-    if not saved_channels:
-        bot.send_message(message.chat.id, "⚠️ Pehle **➕ Add Channel** par click karke apna channel add karein!", reply_markup=get_main_keyboard())
-        return
-    if not is_running:
-        is_running = True
-        bot.send_message(message.chat.id, "✅ **Prediction Started Successfully for all connected channels!**", reply_markup=get_main_keyboard(), parse_mode="Markdown")
-    else:
-        bot.send_message(message.chat.id, "⚠️ Prediction is already running!", reply_markup=get_main_keyboard())
+    is_running = True
+    bot.send_message(message.chat.id, "✅ **Prediction Started!**", reply_markup=get_main_keyboard(), parse_mode="Markdown")
 
 @bot.message_handler(func=lambda message: message.text == "⏹ Stop Prediction")
 def stop_prediction_command(message):
     global is_running
     is_running = False
-    bot.send_message(message.chat.id, "🛑 **Stopped receiving predictions.**\nTap Start Prediction anytime to resume.", reply_markup=get_main_keyboard(), parse_mode="Markdown")
+    bot.send_message(message.chat.id, "🛑 **Stopped Predictions.**", reply_markup=get_main_keyboard(), parse_mode="Markdown")
 
 @bot.message_handler(func=lambda message: message.text == "➕ Add Channel")
 def add_channel_prompt(message):
     user_states[message.chat.id] = "waiting_for_channel"
-    bot.send_message(message.chat.id, "📢 Apne Telegram Channel ka username bhejiye (Jaise: `@mychannel`):\n\n*(Note: Bot ko apne channel par Admin zaroor banayein)*", reply_markup=get_main_keyboard())
+    bot.send_message(message.chat.id, "📢 Channel username bhejein (`@mychannel`):", reply_markup=get_main_keyboard())
 
 @bot.message_handler(func=lambda message: message.text == "📋 My Channels")
 def list_channels(message):
     if not saved_channels:
-        bot.send_message(message.chat.id, "📂 Koi bhi channel abhi add nahi kiya gaya hai.", reply_markup=get_main_keyboard())
+        bot.send_message(message.chat.id, "📂 Koi channel add nahi hai.", reply_markup=get_main_keyboard())
     else:
         ch_list = "\n".join([f"• {ch}" for ch in saved_channels])
         bot.send_message(message.chat.id, f"📋 **Connected Channels:**\n{ch_list}", reply_markup=get_main_keyboard(), parse_mode="Markdown")
@@ -112,27 +102,19 @@ def list_channels(message):
 def save_new_channel(message):
     global saved_channels
     channel_username = message.text.strip()
-    
     if not channel_username.startswith("@"):
-        bot.send_message(message.chat.id, "❌ Galat format! Kripya `@channelname` ke roop mein bhejiye.", reply_markup=get_main_keyboard())
+        bot.send_message(message.chat.id, "❌ Format galat hai! `@channelname` bhejein.", reply_markup=get_main_keyboard())
         return
-        
     if channel_username not in saved_channels:
         saved_channels.append(channel_username)
         save_channels(saved_channels)
-        bot.send_message(message.chat.id, f"✅ Channel **{channel_username}** successfully add ho gaya hai!", reply_markup=get_main_keyboard(), parse_mode="Markdown")
-    else:
-        bot.send_message(message.chat.id, "⚠️ Yeh channel pehle se added hai!", reply_markup=get_main_keyboard())
-        
+        bot.send_message(message.chat.id, f"✅ Added {channel_username}", reply_markup=get_main_keyboard())
     user_states[message.chat.id] = None
 
-
-# ---------------- DYNAMIC IMAGE GENERATOR ----------------
 def generate_prediction_image(period, trend, number_str, wins, streak):
     img_width, img_height = 800, 900
     image = Image.new("RGB", (img_width, img_height), color=(10, 5, 15))
     draw = ImageDraw.Draw(image)
-    
     try:
         font_large = ImageFont.truetype("arial.ttf", 45)
         font_med = ImageFont.truetype("arial.ttf", 30)
@@ -159,18 +141,17 @@ def generate_prediction_image(period, trend, number_str, wins, streak):
     image.save(file_path)
     return file_path
 
-
-# ---------------- LIVE API & BROADCAST ENGINE ----------------
 def fetch_wingo_data():
+    headers = {"User-Agent": "Mozilla/5.0"}
     try:
         url = f"https://draw.ar-lottery01.com/WinGo/WinGo_1M/GetHistoryIssuePage.json?t={int(time.time()*1000)}"
-        res = requests.get(url, timeout=5)
+        res = requests.get(url, headers=headers, timeout=8)
         if res.status_code == 200:
             data = res.json()
-            if data and 'data' in data and 'list' in data['data']:
+            if 'data' in data and 'list' in data['data']:
                 return data['data']['list']
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"API Error: {e}")
     return None
 
 def background_prediction_loop():
@@ -182,7 +163,7 @@ def background_prediction_loop():
             continue
             
         history = fetch_wingo_data()
-        if not history or len(history) == 0:
+        if not history:
             continue
             
         latest_draw = history[0]
@@ -190,36 +171,23 @@ def background_prediction_loop():
         winning_number = int(latest_draw['number'])
         winning_size = "BIG" if winning_number >= 5 else "SMALL"
         
+        # Checking result of active prediction
         if active_prediction and active_prediction['period'] == current_period:
             pred_type = active_prediction['prediction']
             pred_num = active_prediction['number']
             
-            is_win = False
-            is_jackpot = False
-            
-            if pred_type == winning_size:
-                is_win = True
-            elif str(winning_number) in str(pred_num):
-                is_jackpot = True
-            
+            is_win = (pred_type == winning_size)
+            is_jackpot = (str(winning_number) in str(pred_num))
             short_period = current_period[-4:]
             
-            for channel in saved_channels:
+            for ch in saved_channels:
                 try:
-                    if is_jackpot:
-                        bot.send_sticker(channel, JACKPOT_STICKER_ID)
-                        res_msg = f"✅ JACKPOT !\n================================\nPeriod  =>  #{short_period}\nResult  =>  NUM:{winning_number}  🔵  {winning_size}\n================================"
-                        bot.send_message(channel, res_msg)
-                    elif is_win:
-                        bot.send_sticker(channel, WIN_STICKER_ID)
-                        res_msg = f"✅ WIN!\n================================\nPeriod  =>  #{short_period}\nResult  =>  NUM:{winning_number}  🔵  {winning_size}\n================================"
-                        bot.send_message(channel, res_msg)
-                    else:
-                        bot.send_sticker(channel, LOSS_STICKER_ID)
-                        res_msg = f"❌ LOSS\n================================\nPeriod  =>  #{short_period}\nResult  =>  NUM:{winning_number}  🔵  {winning_size}\n================================"
-                        bot.send_message(channel, res_msg)
-                except:
-                    pass
+                    sticker = JACKPOT_STICKER_ID if is_jackpot else (WIN_STICKER_ID if is_win else LOSS_STICKER_ID)
+                    tag = "JACKPOT !" if is_jackpot else ("WIN!" if is_win else "LOSS")
+                    bot.send_sticker(ch, sticker)
+                    bot.send_message(ch, f"{"✅" if is_win or is_jackpot else "❌"} {tag}\nPeriod => #{short_period}\nResult => NUM:{winning_number} {winning_size}")
+                except Exception as err:
+                    print(f"Send Result Error ({ch}): {err}")
                     
             if is_jackpot or is_win:
                 total_wins += 1
@@ -229,6 +197,7 @@ def background_prediction_loop():
                 
             active_prediction = None
 
+        # Post Next Prediction
         if last_checked_issue != current_period:
             last_checked_issue = current_period
             next_period_num = str(int(current_period) + 1)
@@ -262,18 +231,19 @@ def background_prediction_loop():
             
             img_path = generate_prediction_image(short_next_period, trend, pred_number_str, total_wins, current_streak)
             
-            for channel in saved_channels:
+            for ch in saved_channels:
                 try:
                     with open(img_path, 'rb') as photo:
-                        bot.send_photo(channel, photo, caption=prediction_text)
-                except Exception:
+                        bot.send_photo(ch, photo, caption=prediction_text)
+                    print(f"Prediction Sent to {ch}")
+                except Exception as err:
+                    print(f"Send Photo Error ({ch}): {err}")
                     try:
-                        bot.send_message(channel, prediction_text)
-                    except:
-                        pass
+                        bot.send_message(ch, prediction_text)
+                    except Exception as e:
+                        print(f"Send Msg Error ({ch}): {e}")
 
 threading.Thread(target=background_prediction_loop, daemon=True).start()
 
 if __name__ == "__main__":
-    print("Multi-channel bot is running successfully with web health check...")
     bot.infinity_polling()
