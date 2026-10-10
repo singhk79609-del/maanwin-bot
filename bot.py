@@ -6,6 +6,23 @@ import requests
 import telebot
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton
 from PIL import Image, ImageDraw, ImageFont
+from http.server import HTTPServer, BaseHTTPRequestHandler
+
+# --------- RENDER WEB SERVICE HEALTH CHECK FIX ---------
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Maan Win Bot is active and running!")
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    server.serve_forever()
+
+# Web server ko background thread mein chala rahe hain taaki Render ka port busy na ho
+threading.Thread(target=run_web_server, daemon=True).start()
+# --------------------------------------------------------
 
 # ---------------- CONFIGURATION ----------------
 TOKEN = os.getenv("BOT_TOKEN")  # Render Environment Variable se secure tareeqe se uthega
@@ -23,7 +40,6 @@ active_prediction = None
 total_wins = 1198
 current_streak = 1
 
-# User states aur saved channels ke liye file management
 CHANNELS_FILE = "channels.json"
 user_states = {}
 
@@ -42,7 +58,7 @@ def save_channels(channels):
 
 saved_channels = load_channels()
 
-# ---------------- MINI KEYBOARD (Multi-Channel Style) ----------------
+# ---------------- MINI KEYBOARD ----------------
 def get_main_keyboard():
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     btn1 = KeyboardButton("▶ Start Prediction")
@@ -259,5 +275,5 @@ def background_prediction_loop():
 threading.Thread(target=background_prediction_loop, daemon=True).start()
 
 if __name__ == "__main__":
-    print("Multi-channel bot is running successfully...")
+    print("Multi-channel bot is running successfully with web health check...")
     bot.infinity_polling()
